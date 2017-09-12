@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset-"utf-8" />
+	<title>Symbol Drawing</title>
+<head>
+<script id="vertex-shader" type="x-shader/x-vertex">
+	// position changes to we need attribute
+	attribute vec4 vPosition;
+	void main(){
+		gl_Position = vPosition;
+	}
+</script>
+<script id="fragment-shader" type="x-shader/x-fragment">
+	// color stays the same throughout drawing
+	void main(){
+		gl_FragColor = vec4( 0.0, 0.0, 1.0, 1.0 );
+	}
+</script>
+<script type="text/javascript" src="Common/webgl-utils.js"></script>
+<script type="text/javascript" src="Common/initShaders.js"></script>
+<script type="text/javascript" src="Common/MV.js"></script>
+<script type="text/javascript" src="symbol.js"></script>
+
+<body onload="main()">
+	<canvas id="web-gl-canvas" width="500" height="500">
+		Canvas did not load.
+	</canvas>
+
+</html>

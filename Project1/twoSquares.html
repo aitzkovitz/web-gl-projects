@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Draw a simple square</title>
+</head>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+attribute vec4 vPosition;
+void main() {
+    gl_Position = vPosition;
+}
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+// declare a uniform variable of vec4
+uniform vec4 u_FragColor;
+void main() {
+    gl_FragColor = u_FragColor;
+}
+</script>
+
+<script type="text/javascript" src="Common/webgl-utils.js"></script>
+<script type="text/javascript" src="Common/initShaders.js"></script>
+<script type="text/javascript" src="Common/MV.js"></script>
+<script type="text/javascript" src="twoSquares.js"></script>
+
+<body onload="main()">
+<canvas id="gl-canvas" width="400" height="400">
+Your browser doesn't support the HTML5 canvas element
+</canvas>
+</body>
+</html>
