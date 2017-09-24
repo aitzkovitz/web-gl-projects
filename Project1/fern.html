@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset-"utf-8" />
+	<title>Symbol Drawing</title>
+<head>
+<script id="vertex-shader" type="x-shader/x-vertex">
+	// position changes to we need attribute
+	attribute vec4 vPosition;
+	void main(){
+		gl_Position = vPosition;
+		gl_PointSize = 1.0;
+	}
+</script>
+<script id="fragment-shader" type="x-shader/x-fragment">
+	// color changes randomly 
+	precision mediump float;
+	uniform vec4 u_FragColor;
+	void main(){
+		gl_FragColor = u_FragColor;
+	}
+</script>
+<script type="text/javascript" src="../Common/webgl-utils.js"></script>
+<script type="text/javascript" src="../Common/initShaders.js"></script>
+<script type="text/javascript" src="../Common/MV.js"></script>
+<script type="text/javascript" src="fern.js"></script>
+
+<body id="canvasHolder" onload="main()">
+	<canvas id="web-gl-canvas" width="500" height="500">
+		Canvas did not load.
+	</canvas>
+</html>
