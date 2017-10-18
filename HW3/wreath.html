@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+</head>
+<script id="vertex-shader" type="x-shader/x-vertex">
+precision mediump float;
+attribute vec4 vPosition;
+uniform float brAngle;
+uniform float srAngle;
+uniform float scl;
+uniform vec3 trans;
+void main(){
+	// scl is the amount to scale each branch and star.
+	// brAngle is the angle to rotate each branch in to make a star
+	// srAngle is the angle each star rotates around its center
+	// translate is the amount each star is translated to make the wreath
+	mat4 rz1 = mat4(  cos(radians( brAngle )), sin(radians( brAngle )), 0.0, 0.0,
+	            	-sin(radians( brAngle )), cos(radians( brAngle )), 0.0, 0.0,
+	             	0.0,  		   			  0.0,					   1.0,	0.0,
+	             	0.0,  		   			  0.0,					   0.0, 1.0 );
+
+	mat4 scale = mat4(scl, 0.0, 0.0, 0.0,
+                   	0.0,  scl,  0.0, 0.0,
+                   	0.0,  0.0,  scl, 0.0,
+                   	0.0,  0.0,  0.0, 1.0);
+
+	mat4 rz = mat4(  cos(radians( srAngle )), sin(radians( srAngle )), 0.0, 0.0,
+	            	-sin(radians( srAngle )), cos(radians( srAngle )), 0.0, 0.0,
+	             	0.0,  		   			  0.0,					   1.0,	0.0,
+	             	0.0,  		   			  0.0,					   0.0, 1.0 );
+
+	mat4 tr = mat4( 1.0, 0.0, 0.0, 0.0,
+	            	0.0, 1.0, 0.0, 0.0,
+	             	0.0, 0.0, 1.0, 0.0,
+	             	trans.x, trans.y, trans.z, 1.0 );
+
+	// rz1 and scale create one star by rotating branches and scaling
+	// rz rotates that star around its center
+	// tr translates the star according the the angle and which number star it is
+	// **this could also be done by translating to (0,radius) and rotating whole figure
+	gl_Position = tr * rz * rz1 * scale * vPosition;
+} 
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+void main() {
+        gl_FragColor = vec4( 0.0, 0.0, 1.0, 1.0 );
+}
+</script>
+
+<script type="text/javascript" src="../Common/webgl-utils.js"></script>
+<script type="text/javascript" src="../Common/initShaders.js"></script>
+<script type="text/javascript" src="../Common/MV.js"></script>
+<script type="text/javascript" src="wreath.js"></script>
+
+<body onload="main()">
+<canvas id="gl-canvas" width="512" height="512">
+Oops ... your browser doesn't support the HTML5 canvas element
+</canvas>
+</body>
+</html>
