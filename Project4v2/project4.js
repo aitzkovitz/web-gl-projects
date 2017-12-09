@@ -1,10 +1,6 @@
-// Damon Hughes
-// Aaron Itzkovitz
+// Damon Hughes & Aaron Itzkovitz
 // CSCI 4250 Graphics
-// Project 4 Part 1
-// This program makes to composite objects:
-// 1. A crate of balls (which will be textured and colored later)
-// 2. A Backboard, stand, and base, which the hoop will be attached to.
+// Project 4 Part 2
 
 
 var canvas;
@@ -25,6 +21,8 @@ var zoom = 150;
 var lr = 120;
 var ud = 30;
 
+var textures = [];
+var texCoordsArray = [];
 var animate=false;
 var max=.25-.05;
 var step=max /5;
@@ -32,31 +30,28 @@ var min=(.05);
 var y = min;
 var dir='up';
 
+var vertices3 = [];
 var eye = [.1, .8, .9 ];
 
 //////////////// keep count of points in pointsArray /////////////////////
 var cubeCount = 72;
 var sphereCount = 0; // starts at 0
 var cylinderPtsCount = 0;
-var torusCount = 0;
-
-var basketPoints = [
-	[.027, .328, 0.0],
-	[.032, .380, 0.0],
-	[.043, .410, 0.0],
-	[.058, .425, 0.0],
-	[.066, .433, 0.0],
-	[.069, .447, 0.0],
-	[.093, .465, 0.0],
-	[.107, .488, 0.0],
-	[.106, .512, 0.0],
-	[.115, .526, 0.0],
-	[0, .525, 0.0]
-];
+//var circlePtsCount = 0;
 
 // starting vertices for a quad
 // order is square points, then cylinder points, then circle points
 // above vars keep track of where these are
+var texCoord = [
+    vec2(0, 0),
+    vec2(0, 1),
+    vec2(1, 1),
+    vec2(1, 0)
+];
+
+var audio = new Audio('sounds.wav');
+var sound =false;
+
 var vertices = [
     vec4( -0.5, -0.5,  0.5, 1.0 ),
     vec4( -0.5,  0.5,  0.5, 1.0 ),
@@ -77,7 +72,21 @@ var vertices2 = [
     vec4( 0.5,  0.5, -0.5, 1.0 ),
     vec4( 0.5, -0.5, -0.5, 1.0 )
 ];
-var vertices3 = [];
+
+var basketPoints = [
+	[.027, .328, 0.0],
+	[.032, .380, 0.0],
+	[.043, .410, 0.0],
+	[.058, .425, 0.0],
+	[.066, .433, 0.0],
+	[.069, .447, 0.0],
+	[.093, .465, 0.0],
+	[.107, .488, 0.0],
+	[.106, .512, 0.0],
+	[.115, .526, 0.0],
+	[0, .525, 0.0]
+];
+
 var va = vec4(0.0, 0.0, -1.0,1);
 var vb = vec4(0.0, 0.942809, 0.333333, 1);
 var vc = vec4(-0.816497, -0.471405, 0.333333, 1);
@@ -116,30 +125,21 @@ window.onload = function init()
     gl.enable(gl.DEPTH_TEST);
 
     //  Load shaders and initialize attribute buffers
-    var program = initShaders( gl, "vertex-shader", "fragment-shader" );
+	program = initShaders( gl, "vertex-shader", "fragment-shader" );
     gl.useProgram( program );
 
-    // set up lighting and material
-    ambientProduct = mult(lightAmbient, materialAmbient);
-    diffuseProduct = mult(lightDiffuse, materialDiffuse);
-    specularProduct = mult(lightSpecular, materialSpecular);
-
+   
     // generate the points/normals
-    colorCube();  	// + 36
-    colorBarrier();	// + 36
-    tetrahedron(va, vb, vc, vd, numTimesToSubdivide); // + sphereCount
+    colorCube();
+    colorBarrier();
+    tetrahedron(va, vb, vc, vd, numTimesToSubdivide);
     
     // add cylinder points to vertices array
     addCylinderPoints(.01,.4);
     // add quads to pointsArray using those verticies
-    colorCylinder();	// + cylinerptsCount
+    colorCylinder();    
 
-    // we also need to add circle points to vertex array
-    //addRimPoints();		// + torusCount
-
-	SurfaceRevPoints();
-
-
+    SurfaceRevPoints();
     
     // pass data onto GPU
     var nBuffer = gl.createBuffer();
@@ -157,16 +157,23 @@ window.onload = function init()
     var vPosition = gl.getAttribLocation( program, "vPosition");
     gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vPosition);
+
+    var tBuffer = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer );
+    gl.bufferData( gl.ARRAY_BUFFER, flatten(texCoordsArray), gl.STATIC_DRAW );
+    
+    var vTexCoord = gl.getAttribLocation( program, "vTexCoord" );
+    gl.vertexAttribPointer( vTexCoord, 2, gl.FLOAT, false, 0, 0 );
+    gl.enableVertexAttribArray( vTexCoord );
   
     modelViewMatrixLoc = gl.getUniformLocation( program, "modelViewMatrix" );
     projectionMatrixLoc = gl.getUniformLocation( program, "projectionMatrix" );
 
-    gl.uniform4fv( gl.getUniformLocation(program, "ambientProduct"),flatten(ambientProduct) );
-    gl.uniform4fv( gl.getUniformLocation(program, "diffuseProduct"),flatten(diffuseProduct) );
-    gl.uniform4fv( gl.getUniformLocation(program, "specularProduct"),flatten(specularProduct) );	
-    gl.uniform4fv( gl.getUniformLocation(program, "lightPosition"),flatten(lightPosition) );
-    gl.uniform1f( gl.getUniformLocation(program, "shininess"),materialShininess );
 
+    createNewTexture('wood.png');
+    createNewTexture('newBackboard.jpg');
+    createNewTexture('crowd2.jpg');
+    createNewTexture('Rubber.png');
 
     window.onkeydown = function(event)
     {
@@ -187,6 +194,21 @@ window.onload = function init()
                     ud -= 2;
                 break;
 			case 65:
+				if(sound)
+					audio.pause();
+				else{
+					audio.play();}
+				sound=!sound;
+				animate=!animate;
+				break;
+			case 66:
+				lr = 180;
+				ud = 5;
+				if(sound)
+					audio.pause();
+				else{
+					audio.play();}
+				sound=!sound;
 				animate=!animate;
 				break;
 		}
@@ -195,10 +217,29 @@ window.onload = function init()
     render();
 }
 
+ function lighting(){
+    var ambientProduct = mult(lightAmbient, materialAmbient);
+    var diffuseProduct = mult(lightDiffuse, materialDiffuse);
+    var specularProduct = mult(lightSpecular, materialSpecular);
+    gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"), flatten(ambientProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"), flatten(diffuseProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"), flatten(specularProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
+    gl.uniform1f(gl.getUniformLocation(program, "shininess"), materialShininess);
+}
+ 
 
 // basic functions for drawing prims
 function DrawSolidSphere(radius)
 {
+	lightAmbient = vec4(0.4, 0.4, 0.4, 1);
+    lightDiffuse = vec4(0.2, 0.2, 0.2, 1);
+    lightSpecular = vec4(0.2, 0.2, 0.2, 1);
+    materialAmbient = vec4(1, .65, 0, 1);
+    materialDiffuse = vec4(1, .05, 0, 1);
+    materialSpecular = vec4(1, .05, 0, 1);
+    materialShininess = 200;
+    lighting();
 	mvMatrixStack.push(modelViewMatrix);
 	s = scale4(radius, radius, radius);   // scale to the given radius
     modelViewMatrix = mult(modelViewMatrix, s);
@@ -238,16 +279,17 @@ function DrawSide(thickness)
 
 function drawGround()
 {
+	
     lightAmbient = vec4(0.4, 0.4, 0.4, 1);
     lightDiffuse = vec4(0.2, 0.2, 0.2, 1);
     lightSpecular = vec4(0.2, 0.2, 0.2, 1);
-    materialAmbient = vec4(.9 ,.8 ,.7, 1);
-    materialDiffuse = vec4(.9 ,.8 ,.7, 1);
-    materialSpecular = vec4(.9 ,.8 ,.7, 1);
-    materialShininess = 300;
-    //SetupLightingMaterial();
-    //gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
+    materialAmbient = vec4(.9, .72, .4, 1);
+    materialDiffuse = vec4(.9, .72, .4, 1);
+    materialSpecular = vec4(.9, .72, .4, 1);
+    materialShininess = 6;
+    lighting();
 
+    gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
     mvMatrixStack.push(modelViewMatrix);
     r = rotate(0.0, 1.0, 0.0, 0.0);
 	s = scale4(2,1,1);
@@ -290,7 +332,7 @@ function drawPole(){
 function drawRim(){
 	mvMatrixStack.push(modelViewMatrix);
 	s = scale4(.6,.6,.6);
-	t = translate(-.85,.55,0);
+	t = translate(-.85,.45,0);
 	r = rotate(.1, 0, 1, 0);
 	modelViewMatrix = mult(mult(mult(modelViewMatrix, t), r), s);
     gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
@@ -300,7 +342,7 @@ function drawRim(){
 
 // draw the backboard using cube prim
 function drawBackBoard(){
-
+	gl.uniform1i(gl.getUniformLocation(program, "texture"), 1);
 	mvMatrixStack.push(modelViewMatrix);
 	r = rotate(90.0, 0.0, 0.0, 1.0);
 	s = scale4(.3,.3,.3);
@@ -308,12 +350,22 @@ function drawBackBoard(){
     modelViewMatrix = mult(mult(mult(modelViewMatrix, t), r), s);
 	DrawSide(0.03); 
 	modelViewMatrix = mvMatrixStack.pop();
+	gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
 
 }
 
 // draw basketballs
 function drawBalls(){
+	lightAmbient = vec4(0.4, 0.4, 0.4, 1);
+    lightDiffuse = vec4(0.7, 0.0, 0.0, 1);
+    lightSpecular = vec4(0.4, 0.4, 0.4, 1);
+    materialAmbient = vec4(1, 1, 0, 1);
+    materialDiffuse = vec4(0, 0, 1, 1);
+    materialSpecular = vec4(1, 1, 1, 1);
+    materialShininess = 200;
+    lighting(); 
 
+	gl.uniform1i(gl.getUniformLocation(program, "texture"), 3);
 	mvMatrixStack.push(modelViewMatrix);
 	t = translate(0,.125,0);
     modelViewMatrix = mult(modelViewMatrix, t);
@@ -343,12 +395,22 @@ function drawBalls(){
     modelViewMatrix = mult(modelViewMatrix, t);
 	DrawSolidSphere(.1);
 	modelViewMatrix = mvMatrixStack.pop();
+	gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
 
 }
 
 // draw crate holding basketballs
 function drawCrate(){
 	// wall # 1
+	lightAmbient = vec4(0.4, 0.4, 0.4, 1);
+    lightDiffuse = vec4(0.2, 0.2, 0.2, 1);
+    lightSpecular = vec4(0.2, 0.2, 0.2, 1);
+    materialAmbient = vec4(1, 0, 0, 1);
+    materialDiffuse = vec4(1, 0, 0, 1);
+    materialSpecular = vec4(1, 0, 0, 1);
+    materialShininess = 200;
+    lighting(); 
+	
 	mvMatrixStack.push(modelViewMatrix);
 	r = rotate(0.0, 0.0, 0.0, 1.0);
 	s = scale4(1,1,1);
@@ -393,28 +455,61 @@ function drawCrate(){
 
 	// draw balls in crate
 
-	drawBalls();
+
 }
 
 // draw the whole hoop
 function drawHoop(){
-
+ lightAmbient = vec4(0.4, 0.4, 0.4, 1);
+    lightDiffuse = vec4(0.2, 0.2, 0.2, 1);
+    lightSpecular = vec4(0.2, 0.2, 0.2, 1);
+    materialAmbient = vec4(.3, .1, .3, 1);
+    materialDiffuse = vec4(.3, .1, .3, 1);
+    materialSpecular = vec4(.3, .1, .3, 1);
+    materialShininess = 200;
+    lighting();
 	// base will be a prism
 	drawBase();
 
 	// pole will be a cylindrical mesh
 	drawPole();
+	lightAmbient = vec4(0.4, 0.4, 0.4, 1);
+    lightDiffuse = vec4(0.2, 0.2, 0.2, 1);
+    lightSpecular = vec4(0.2, 0.2, 0.2, 1);
+    materialAmbient = vec4(1, 1, 1, 1);
+    materialDiffuse = vec4(1, 1, 1, 1);
+    materialSpecular = vec4(0, 1, 0, 1);
+    materialShininess = 200;
+    lighting();
 
 	// backboard will also be a prism
 	drawBackBoard();
 
+	drawPole();
+	lightAmbient = vec4(0.4, 0.4, 0.4, 1);
+    lightDiffuse = vec4(0.2, 0.2, 0.2, 1);
+    lightSpecular = vec4(0.2, 0.2, 0.2, 1);
+    materialAmbient = vec4(1, 1, 1, 1);
+    materialDiffuse = vec4(1, 1, 1, 1);
+    materialSpecular = vec4(1, 1, 1, 1);
+    materialShininess = 200;
+    lighting();
 	// function to draw hoop (torus with surface of revolution)
 	drawRim();
 
 }
 
 function drawBarriers(){
+	lightAmbient = vec4(0.4, 0.4, 0.4, 1);
+    lightDiffuse = vec4(0.4, 0.4, 0.4, 1);
+    lightSpecular = vec4(0.2, 0.2, 0.2, 1);
+    materialAmbient = vec4(0, 0, 0, 1);
+    materialDiffuse = vec4(1, 1, 1, 1);
+    materialSpecular = vec4(1, 1, 1, 1);
+    materialShininess = 200;
+    lighting();
 
+    gl.uniform1i(gl.getUniformLocation(program, "texture"), 2);
 	mvMatrixStack.push(modelViewMatrix);
 	r = rotate(0, 1.0, 0.0, 0.0);
 	s = scale4(3,.5,.35);
@@ -432,6 +527,7 @@ function drawBarriers(){
     gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
     gl.drawArrays( gl.TRIANGLES, 36, 36);
 	modelViewMatrix = mvMatrixStack.pop();
+	gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
 }
 
 function render()
@@ -449,12 +545,14 @@ function render()
         radius * Math.sin(ud/180 * Math.PI),
         radius * Math.cos(ud/180 * Math.PI) * Math.sin(lr/180 * Math.PI)
     );
-    //[1,4,10]
+    //[-1,4,10]
     modelViewMatrix = lookAt(eye, [0, 0, 0], [0, 1, 0]);
  	gl.uniformMatrix4fv(projectionMatrixLoc, false, flatten(projectionMatrix));
 	gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
 
-	// draw three main objects
+	////// draw three main objects
+	// set texture 0
+	gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
 	drawGround();	
 
 	// draw barrier
@@ -470,6 +568,13 @@ function render()
     modelViewMatrix = mult(mult(modelViewMatrix, t), s);
 	drawCrate();
 	modelViewMatrix = mvMatrixStack.pop();
+
+	mvMatrixStack.push(modelViewMatrix);
+	s = scale4(.25,.25,.25);
+	t = translate(-1,0,-.375);
+    modelViewMatrix = mult(mult(modelViewMatrix, t), s);
+	drawBalls();
+	modelViewMatrix = mvMatrixStack.pop();
 	
 	// draw hoop
 	mvMatrixStack.push(modelViewMatrix);
@@ -477,8 +582,47 @@ function render()
     modelViewMatrix = mult(modelViewMatrix, t);
 	drawHoop();
 	modelViewMatrix = mvMatrixStack.pop();
-
+	mvMatrixStack.push(modelViewMatrix);
+	drawCamera();
+	modelViewMatrix = mvMatrixStack.pop();
 	requestAnimationFrame(render);
+}
+function drawCamera(){ 
+  lightAmbient = vec4(0.4, 0.4, 0.4, 1);
+    lightDiffuse = vec4(0.2, 0.2, 0.2, 1);
+    lightSpecular = vec4(0.2, 0.2, 0.2, 1);
+    materialAmbient = vec4(0, 0, 0, 1);
+    materialDiffuse = vec4(0, 0, 0, 1);
+    materialSpecular = vec4(0, 0, 0, 1);
+    materialShininess = 6;
+    lighting();
+	modelViewMatrix=mult(modelViewMatrix,translate(-2,0,0));
+	mvMatrixStack.push(modelViewMatrix);
+	t = translate(0,0.25,0)
+	modelViewMatrix=mult(modelViewMatrix,t);
+ 	DrawSolidCube(.1);
+ 
+	modelViewMatrix=mvMatrixStack.pop();
+	mvMatrixStack.push(modelViewMatrix);
+	lightAmbient = vec4(0.4, 0.4, 0.4, 1);
+    lightDiffuse = vec4(0.2, 0.2, 0.2, 1);
+    lightSpecular = vec4(0.2, 0.2, 0.2, 1);
+    materialAmbient = vec4(1, 1, 0, 1);
+    materialDiffuse = vec4(1, 1, 0, 1);
+    materialSpecular = vec4(1, 1, 0, 1);
+    materialShininess = 6;
+    lighting();
+ 
+ 	t = translate(.05,0.25,0)
+	modelViewMatrix=mult(modelViewMatrix,t);
+ 	DrawSolidCube(.025);
+  	modelViewMatrix=mvMatrixStack.pop();
+ 	mvMatrixStack.push(modelViewMatrix);
+ 	t = translate(0,.005,0);
+  	s = scale4(1,50,1);
+  	modelViewMatrix=mult(mult(modelViewMatrix,t),s);
+	DrawSolidCube(.01);
+	modelViewMatrix=mvMatrixStack.pop();
 }
 
 //////////// util functions /////////////
@@ -491,6 +635,10 @@ function triangle(a, b, c)
      pointsArray.push(a);
      pointsArray.push(b);      
      pointsArray.push(c);
+
+     texCoordsArray.push(texCoord[0]);
+     texCoordsArray.push(texCoord[1]);
+     texCoordsArray.push(texCoord[2]);
 
      sphereCount += 3;
 }
@@ -536,65 +684,103 @@ function quad(a, b, c, d)
 
  	pointsArray.push(vertices[a]);
  	normalsArray.push(normal);
+ 	texCoordsArray.push(texCoord[0]);
+
  	pointsArray.push(vertices[b]);
  	normalsArray.push(normal);
+ 	texCoordsArray.push(texCoord[1]);
+
  	pointsArray.push(vertices[c]);
  	normalsArray.push(normal);
+	texCoordsArray.push(texCoord[2]);
+
  	pointsArray.push(vertices[a]);
  	normalsArray.push(normal);
+ 	texCoordsArray.push(texCoord[0]);
+
  	pointsArray.push(vertices[c]);
  	normalsArray.push(normal);
+ 	texCoordsArray.push(texCoord[2]);
+
  	pointsArray.push(vertices[d]);
  	normalsArray.push(normal);
+ 	texCoordsArray.push(texCoord[3]);
 }
 
-function quad2(a, b, c, d) 
+function quad2(a, b, c, d, flag) 
 {
  	var t1 = subtract(vertices2[b], vertices2[a]);
  	var t2 = subtract(vertices2[c], vertices2[b]);
  	var normal = cross(t1, t2);
  	var normal = vec3(normal);
  	normal = normalize(normal);
+ 	if (flag){
+ 	 	pointsArray.push(vertices2[a]);
+	 	normalsArray.push(normal);
+	 	texCoordsArray.push(texCoord[0]);
+	 	pointsArray.push(vertices2[b]);
+	 	normalsArray.push(normal);
+	 	texCoordsArray.push(texCoord[1]);
+	 	pointsArray.push(vertices2[c]);
+	 	normalsArray.push(normal);
+	 	texCoordsArray.push(texCoord[2]);
+	 	pointsArray.push(vertices2[a]);
+	 	normalsArray.push(normal);
+	 	texCoordsArray.push(texCoord[0]);
+	 	pointsArray.push(vertices2[c]);
+	 	normalsArray.push(normal);
+	 	texCoordsArray.push(texCoord[2]);
+	 	pointsArray.push(vertices2[d]);
+	 	normalsArray.push(normal);
+	 	texCoordsArray.push(texCoord[3]);
+ 	} else {
+ 		pointsArray.push(vertices2[a]);
+	 	normalsArray.push(normal);
+	 	pointsArray.push(vertices2[b]);
+	 	normalsArray.push(normal);
+	 	pointsArray.push(vertices2[c]);
+	 	normalsArray.push(normal);
+	 	pointsArray.push(vertices2[a]);
+	 	normalsArray.push(normal);
+	 	pointsArray.push(vertices2[c]);
+	 	normalsArray.push(normal);
+	 	pointsArray.push(vertices2[d]);
+	 	normalsArray.push(normal);
 
- 	pointsArray.push(vertices2[a]);
- 	normalsArray.push(normal);
- 	pointsArray.push(vertices2[b]);
- 	normalsArray.push(normal);
- 	pointsArray.push(vertices2[c]);
- 	normalsArray.push(normal);
- 	pointsArray.push(vertices2[a]);
- 	normalsArray.push(normal);
- 	pointsArray.push(vertices2[c]);
- 	normalsArray.push(normal);
- 	pointsArray.push(vertices2[d]);
- 	normalsArray.push(normal);
+ 	}
+
 }
-
 
 function quad3(a, b, c, d) {
 
-     var indices=[a, b, c, d];
-     var normal = Newell(indices);
+    var indices=[a, b, c, d];
+    var normal = Newell(indices);
 
      // triangle a-b-c
-     pointsArray.push(vertices3[a]); 
-     normalsArray.push(normal); 
+    pointsArray.push(vertices3[a]); 
+    normalsArray.push(normal);
+    texCoordsArray.push(texCoord[0]);
 
-     pointsArray.push(vertices3[b]); 
-     normalsArray.push(normal); 
+    pointsArray.push(vertices3[b]); 
+    normalsArray.push(normal);
+    texCoordsArray.push(texCoord[1]);
 
-     pointsArray.push(vertices3[c]); 
-     normalsArray.push(normal);   
+    pointsArray.push(vertices3[c]); 
+    normalsArray.push(normal);
+    texCoordsArray.push(texCoord[2]);
 
      // triangle a-c-d
-     pointsArray.push(vertices3[a]);  
-     normalsArray.push(normal); 
+    pointsArray.push(vertices3[a]);
+    normalsArray.push(normal); 
+    texCoordsArray.push(texCoord[0]);
 
-     pointsArray.push(vertices3[c]); 
-     normalsArray.push(normal); 
+    pointsArray.push(vertices3[c]); 
+    normalsArray.push(normal); 
+    texCoordsArray.push(texCoord[2]);
 
-     pointsArray.push(vertices3[d]); 
-     normalsArray.push(normal);    
+    pointsArray.push(vertices3[d]); 
+    normalsArray.push(normal);    
+    texCoordsArray.push(texCoord[3]);
 }
 
 function colorCube()
@@ -609,26 +795,28 @@ function colorCube()
 
 function colorBarrier()
 {
-	quad2( 1, 0, 3, 2 );
-	quad2( 2, 3, 7, 6 );
-	quad2( 3, 0, 4, 7 );
-	quad2( 6, 5, 1, 2 );
-	quad2( 4, 5, 6, 7 );
-	quad2( 5, 4, 0, 1 );
+	quad2( 1, 0, 3, 2, 1 );
+	quad2( 2, 3, 7, 6, 1 );
+	quad2( 3, 0, 4, 7, 1 );
+	quad2( 6, 5, 1, 2, 1 );
+	quad2( 4, 5, 6, 7, 1 );
+	quad2( 5, 4, 0, 1, 1 );
 }
 function animation(){
-	t=translate(-1,.05,0);
-	modelViewMatrix=mult(modelViewMatrix,t);
-	if (animate){
-		if(y<min){ dir='up';
-		max=Math.random()/2;
+	t = translate(-1,.05,0);
+	modelViewMatrix = mult(modelViewMatrix,t);
+	if ( animate ){
+		if( y < min ){ dir = 'up';
+			max = Math.random()/2;
 		}
-		if(y>max)dir='down';
-		if((y <= max) && (dir=='up'))y+=step;
-		if((y>=min) && (dir =='down'))y-=step;
-		modelViewMatrix=mult(modelViewMatrix,translate(0,y,0));
+		if ( y > max ) dir = 'down';
+		if ( ( y <= max) && ( dir == 'up' ) ) y += step;
+		if ( ( y >= min) && ( dir == 'down' ) ) y -= step;
+		modelViewMatrix = mult( modelViewMatrix, translate( 0, y, 0 ) );
 	}
+	gl.uniform1i(gl.getUniformLocation(program, "texture"), 3);
 	DrawSolidSphere(.05);
+	gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
 }
 
 // add cylinder points to vertices array
@@ -639,8 +827,8 @@ function addCylinderPoints(radius, height){
 	for (var i = 0; i < resolution; i += 2 ){
 		vertices.push(vec4( radius * Math.cos( angle * i ), radius * Math.sin( angle * i), 0.0, 1.0 ));
 		vertices.push(vec4( radius * Math.cos( angle * i ), radius * Math.sin( angle * i), height, 1.0 ));
-		vertices.push(vec4( radius * Math.cos( angle * (i+1)), radius * Math.sin( angle * (i+1)), 0.0, 1.0 ));
-		vertices.push(vec4( radius * Math.cos( angle * (i+1)), radius * Math.sin( angle * (i+1)), height, 1.0 ));
+		vertices.push(vec4( radius * Math.cos( angle * (i+1)), radius * Math.sin( angle * ( i+1 )), 0.0, 1.0 ));
+		vertices.push(vec4( radius * Math.cos( angle * (i+1)), radius * Math.sin( angle * ( i+1 )), height, 1.0 ));
 		cylinderPtsCount += 4;
 	}
 }
@@ -648,8 +836,7 @@ function addCylinderPoints(radius, height){
 function SurfaceRevPoints()
 {
 	//Setup initial points matrix
-	for (var i = 0; i < 11; i++)
-	{
+	for (var i = 0; i < 11; i++){
 		vertices3.push(vec4(basketPoints[i][0], basketPoints[i][1], basketPoints[i][2], 1));
 	}
 
@@ -657,23 +844,19 @@ function SurfaceRevPoints()
     var t = Math.PI/12;
 
     // sweep the original curve another "angle" degree
-	for (var j = 0; j < 24; j++)
-	{
+	for (var j = 0; j < 24; j++){
 		var angle = (j+1)*t; 
 		// for each sweeping step, generate 25 new points corresponding to the original points
-		for(var i = 0; i < 12; i++)
-		{	
+		for(var i = 0; i < 12; i++){	
 		    r = vertices3[i][0];
-            vertices3.push(vec4(r*Math.cos(angle), vertices3[i][1], -r*Math.sin(angle), 1));
-		}    	
+            vertices3.push(vec4( r * Math.cos(angle), vertices3[i][1], -r * Math.sin(angle), 1));
+		}
 	}
 
 	var N = 11; 
 	// quad strips are formed slice by slice (not layer by layer)
-	for (var i=0; i<24; i++) // slices
-	{
-	   	for (var j=0; j<12; j++)  // layers
-	   	{
+	for (var i=0; i<24; i++) {// slices{
+	   	for (var j=0; j<12; j++){  // layers{
 			quad3(i*N+j, (i+1)*N+j, (i+1)*N+(j+1), i*N+(j+1)); 
 	   	}
 	}    
@@ -695,24 +878,44 @@ function scale4(a, b, c) {
    	return result;
 }
 
-function Newell(indices)
-{
-   var L=indices.length;
-   var x=0, y=0, z=0;
-   var index, nextIndex;
+function Newell(indices){
 
-   for (var i=0; i<L; i++)
-   {
-       index=indices[i];
-       nextIndex = indices[(i+1)%L];
+   	var L = indices.length;
+   	var x = 0, y = 0, z = 0;
+   	var index, nextIndex;
+
+   	for (var i = 0; i < L; i++ ){
+        
+        index=indices[i];
+        nextIndex = indices[ (i+1) % L ];
        
-       x += (vertices3[index][1] - vertices3[nextIndex][1])*
-            (vertices3[index][2] + vertices3[nextIndex][2]);
-       y += (vertices3[index][2] - vertices3[nextIndex][2])*
-            (vertices3[index][0] + vertices3[nextIndex][0]);
-       z += (vertices3[index][0] - vertices3[nextIndex][0])*
-            (vertices3[index][1] + vertices3[nextIndex][1]);
-   }
+        x += (vertices3[index][1] - vertices3[nextIndex][1])*
+             (vertices3[index][2] + vertices3[nextIndex][2]);
+        y += (vertices3[index][2] - vertices3[nextIndex][2])*
+             (vertices3[index][0] + vertices3[nextIndex][0]);
+        z += (vertices3[index][0] - vertices3[nextIndex][0])*
+             (vertices3[index][1] + vertices3[nextIndex][1]);
+   	}
 
-   return (normalize(vec3(x, y, z)));
+   	return (normalize(vec3(x, y, z)));
+}
+
+function createNewTexture(picName)
+{
+    var i = textures.length;
+    textures[i] = gl.createTexture();
+    textures[i].image = new Image();
+    textures[i].image.src = picName;
+    textures[i].image.onload = function() { loadNewTexture(i); }
+}
+function loadNewTexture(index)
+{
+    //gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.activeTexture(gl.TEXTURE0 + index);
+    gl.bindTexture(gl.TEXTURE_2D, textures[index]);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, textures[index].image);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 }
